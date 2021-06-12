@@ -1,0 +1,937 @@
+var width = window.innerWidth;
+var height = window.innerHeight;
+
+var cursorPosition; 
+var cursorPos;
+var clickCallback;
+var cursorPosX;
+var cursorPosY;
+var thisTile;
+var thisTileiso;
+var unitData;
+var thisUnit;
+var dontWalk;
+var dontWalkcat;
+var dontWalkSprite;
+var dontWalkSpritecat;
+var iso;
+var poly;
+
+var unitContainer;
+
+var timedEvent;
+var thisScene;
+
+var selected; 
+var selectedUnit;
+
+var onEvent;
+
+var directions = {
+    west: { offset: 92, x: -2, y: 0, opposite: 'east' },
+    northWest: { offset: 138, x: -2, y: -1, opposite: 'southEast' },
+    north: { offset: 184, x: 0, y: -2, opposite: 'south' },
+    northEast: { offset: 230, x: 2, y: -1, opposite: 'southWest' },
+    east: { offset: 276, x: 2, y: 0, opposite: 'west' },
+    southEast: { offset: 322, x: 2, y: 1, opposite: 'northWest' },
+    south: { offset: 0, x: 0, y: 2, opposite: 'north' },
+    southWest: { offset: 46, x: -2, y: 1, opposite: 'northEast' }
+};
+
+var anims = {
+    walk: {
+        startFrame: 0,
+        endFrame: 22,
+        speed: 0.05
+    },
+    attack: {
+        startFrame: 23,
+        endFrame: 45,
+        speed: 0.01
+    },
+	idle: {
+		startFrame: 0,
+		endFrame: 0,
+		speed: 0
+	}
+
+};
+
+var metruss = [];
+
+
+var tileWidthHalf;
+var tileHeightHalf;
+
+var d = 0;
+
+var scene;
+
+//METRUS CONTAINER
+class MetrusContainer extends Phaser.GameObjects.Image {
+	
+    constructor(scene, x, y, motion, direction, distance, id) {
+        super(scene, x, y, 'metrustotalsprite', direction.offset);
+		
+		
+		
+	}
+	
+}
+
+//METRUS GAME OBJECT
+class Metrus extends Phaser.Physics.Arcade.Image {
+	
+    constructor(scene, x, y, motion, direction, distance, id) {
+        super(scene, x, y, 'metrustotalsprite', direction.offset);
+
+		this.id = id;
+        this.startX = x;
+        this.startY = y;
+        this.distance = distance;
+
+        this.motion = motion;
+        this.anim = anims[motion];
+        this.direction = directions[direction];
+        this.speed = 1.1;
+        this.f = this.anim.startFrame;
+		
+	
+		this.setOrigin(0.5, 0.75);
+		this.height = 50;
+		this.width = 50;
+		this.setScale(0.4);
+		//this.displayWidth = 90; 
+		//this.displayHeight = 90;	
+
+
+		//this.setScale(0.4);
+		
+		
+		
+		this.selected = false;
+
+
+        this.depth = y + 64;
+		
+		
+		
+
+		
+
+		
+		let thisScene = scene;
+		
+		//CAN THIS UNIT WALK ON NON WALKABLE TILES
+		//dontWalkSprite.add(this);
+		
+		
+
+		
+		var unitPhysics = this.scene.matter.add.gameObject(this, { shape: 'circle' });	
+		this.displayOriginX = 150;
+		this.displayOriginY = 150;
+		
+		//unitPhysics.scene.setCollideWorldBounds(true);
+		console.log(unitPhysics);
+		
+		unitPhysics.setInteractive().on('pointerdown', function(pointer, localX, localY, event){
+			
+			console.log(pointer.x+'/'+pointer.y);
+			console.log(this);
+			
+		var selected;
+			
+		this.selected = true;
+			
+			if (this.selected == true) {
+				this.tint = 0xFF0000;
+			}
+			
+		});
+
+		//unitPhysics.setImmovable(true);
+		
+
+		
+        scene.time.delayedCall(this.anim.speed * 1000, this.changeFrame, [], this);
+		
+
+		
+		//unitPhysics.body.setOrigin(0.9, 0.9);
+		
+		//console.log(unitContainer);
+		
+    }
+
+    changeFrame ()
+    {
+		//scene = GameScene;
+		var timedEvent;
+		
+        this.f++;
+
+        var delay = this.anim.speed;
+
+        if (this.f === this.anim.endFrame)
+        {
+            switch (this.motion)
+            {
+                case 'walk':
+                    this.f = this.anim.startFrame;
+                    this.frame = this.texture.get(this.direction.offset + this.f);
+                    this.scene.time.delayedCall(delay * 1000, this.changeFrame, [], this);
+                    break;
+
+                case 'attack':
+                    delay = Math.random() * 2;
+                    this.scene.time.delayedCall(delay * 1000, this.resetAnimation, [], this);
+                    break;
+					
+                case 'idle':
+                    delay = 0.5 + Math.random();
+                    scene.time.delayedCall(delay * 1000, this.resetAnimation, [], this);
+                    break;
+
+            }
+        }
+        else
+        {
+			
+			
+            this.frame = this.texture.get(this.direction.offset + this.f);
+			this.scene.time.delayedCall(delay * 1000, this.changeFrame, [], this);
+			
+        }
+    }
+
+    resetAnimation ()
+    {
+        this.f = this.anim.startFrame;
+
+        this.frame = this.texture.get(this.direction.offset + this.f);
+		
+        this.scene.time.delayedCall(this.anim.speed * 1000, this.changeFrame, [], this);
+    }
+
+    update ()
+    {
+        if (this.motion === 'walk')
+        {
+			//this.selectedUnit.x += this.direction.x * this.speed;
+            this.x += this.direction.x * this.speed;
+
+            if (this.direction.y !== 0)
+            {
+				//this.selectedUnit.y += this.direction.y * this.speed;
+                this.y += this.direction.y * this.speed;
+                this.depth = this.y + 64;
+            }
+
+            //  Walked far enough?
+            if (Phaser.Math.Distance.Between(this.startX, this.startY, this.x, this.y) >= this.distance)
+            {
+                this.direction = directions[this.direction.opposite];
+                this.f = this.anim.startFrame;
+                this.frame = this.texture.get(this.direction.offset + this.f);
+                this.startX = this.x;
+                this.startY = this.y;
+            }
+        }
+    }
+	
+}
+
+class GameScene extends Phaser.Scene {
+	
+	constructor() {
+		super('GameScene')	
+	}
+
+    preload () {
+		scene = GameScene;
+		
+		this.load.image('stars', '../assets/backgrounds/stars.png');
+			
+		//UI SPRITESHEETS
+		this.load.spritesheet('selected', '../assets/ui/selected.png', {frameWidth: 128, frameHeight: 128 });
+		
+		//TERRAIN SPRITESHEETS
+		this.load.spritesheet('grasssprite', '../assets/terrain/grassworld/grasssprite.png', {frameWidth: 128, frameHeight: 128 });
+		this.load.spritesheet('watersprite', '../assets/terrain/grassworld/watersprite.png', {frameWidth: 128, frameHeight: 128 });
+		this.load.spritesheet('flatsprite', '../assets/terrain/grassworld/flatsprite.png', {frameWidth: 128, frameHeight: 128 });
+		this.load.spritesheet('obstacles', '../assets/terrain/grassworld/obstacles.png', {frameWidth: 128, frameHeight: 128 });
+		
+		//UNIT SPRITESHEETS
+		
+		//CIMEX METRUS WALK
+		this.load.spritesheet('metruswalknorth', '../assets/cimex/metrus/walk/walknorth.png', {frameWidth: 300, frameHeight: 300 });
+		this.load.spritesheet('metruswalknortheast', '../assets/cimex/metrus/walk/walknortheast.png', {frameWidth: 300, frameHeight: 300 });
+		this.load.spritesheet('metruswalkeast', '../assets/cimex/metrus/walk/walkeast.png', {frameWidth: 300, frameHeight: 300 });
+		this.load.spritesheet('metruswalksoutheast', '../assets/cimex/metrus/walk/walksoutheast.png', {frameWidth: 300, frameHeight: 300 });
+		this.load.spritesheet('metruswalksouth', '../assets/cimex/metrus/walk/walksouth.png', {frameWidth: 300, frameHeight: 300 });
+		this.load.spritesheet('metruswalksouthwest', '../assets/cimex/metrus/walk/walksouthwest.png', {frameWidth: 300, frameHeight: 300 });
+		this.load.spritesheet('metruswalkwest', '../assets/cimex/metrus/walk/walkwest.png', {frameWidth: 300, frameHeight: 300 });
+		this.load.spritesheet('metruswalknorthwest', '../assets/cimex/metrus/walk/walknorthwest.png', {frameWidth: 300, frameHeight: 300 });
+		
+		this.load.spritesheet('metrustotalsprite', '../assets/cimex/metrus/metrustotalsprite.png', {frameWidth: 300, frameHeight: 300 });
+
+		//this.time.advancedTiming = true;
+
+
+    }
+	
+	
+    create () {
+		scene = GameScene;
+		
+		this.matter.world.setBounds().disableGravity();
+		
+		var time = new Date();
+		
+		this.background = this.add.image(0,0, 'stars');
+		this.background.setOrigin(0,0);
+		this.background.displayWidth=game.config.width*1;
+		this.background.displayHeight=game.config.height*1;
+		this.background.setScrollFactor(0)
+		this.background.fixedToCamera = true;
+		
+		var camWidth = game.config.width;
+		var camHeight = game.config.Height;
+		
+		
+		//SELECTED UNIT ANIMATION ANIM
+		this.anims.create({
+			key: 'selectedanim',
+			frames: this.anims.generateFrameNumbers('selected', { start: 0, end: 4 }),
+			frameRate: 10,
+			repeat:
+			-1
+		});
+		
+		dontWalk = this.add.group();
+		var dontWalkcat = this.matter.world.nextCategory();
+		//dontWalk.setCollisionCategory(dontWalkcat);
+		
+		dontWalkSprite = this.add.group();
+		dontWalkSpritecat = this.matter.world.nextCategory();
+		//dontWalksprite.setCollisionCategory(dontWalkspritecat);
+		
+		/*
+		for (var z = 0; i < dontWalkSprite.length; z++)
+		{
+		
+			console.log(dontWalkSprite[z]);
+		}
+		*/
+		
+		
+		
+		
+		//this.dontWalk.setCollidesWith([ dontWalkcat, dontWalkspritecat ]);
+		
+        // SPAWN TILES FROM THE LEVELDATA
+        this.spawnTiles();
+		
+		function unitData(callback){
+
+			$.ajax({
+				  type: 'GET',
+				global: true, 
+				  dataType: "json",
+				  url:'../includes/units.php',
+				contentType: 'application/json',
+				  success: callback 
+			});
+			
+		}
+		
+		unitData(result => {
+			
+		const tileWidthHalf = tileWidth / 2;
+		const tileHeightHalf = tileHeight / 2;
+		
+		const centerX = mapWidth * tileWidthHalf;
+		const centerY = 64;
+		
+		for (var i = 0; i < levelData.length; i++)
+		{
+			for (var j = 0; j < levelData[0].length; j++)
+			{
+				
+				const tx = (j - i) * tileWidthHalf
+				const ty = (j + i) * tileHeightHalf
+				
+				for (var z = 0; z < result.unitId.length; z++)
+				{
+				var unitX = result.unitX[z];
+				var unitY = result.unitY[z];
+					
+				var unitId = result.unitId[z];
+				var unitUsername = result.unitUsername[z];
+				var unitType = result.unitType[z];
+				var unitAction = result.unitAction[z];
+				var unitHealth = result.unitHealth[z];
+				var unitTotalhealth = result.unitTotalhealth[z];
+				var unitShields = result.unitShields[z];
+				var unitTotalshields = result.unitTotalshields[z];
+				var unitWorld = result.unitWorld[z];
+				var unitDirection = result.unitDirection[z];
+				var unitTarget = result.unitTarget[z];
+					
+					var unitTypearray = unitType + 's';
+					var unitTypeconstructor = unitType.charAt(0); 
+					
+					if (unitX == i)
+					{
+						if (unitY == j) 
+						{
+						//console.log(this);
+						thisUnit = metruss.push(this.add.existing(new Metrus(this, centerX + tx, centerY + ty, unitAction, unitDirection, 100, unitId)));
+						//dontWalk.add(thisUnit);
+						this.cameras.main.centerOn(centerX + tx, centerY + ty);
+
+							
+						}
+					}
+					
+				}
+				
+			}
+		}
+
+		});
+		
+		
+		
+	
+		
+	
+	}
+	
+	
+    update () {
+		
+		//scene = GameScene;
+		
+		var cam = this.cameras.main; 
+		this.cameras.main.setBounds(0, 0, mapWidth*tileWidth, mapWidth*tileHeight);
+		cam.setZoom(1);
+
+		if (Metrus.selected == true) {
+				console.log(this);
+			}
+		
+        const controlConfig = {
+            camera: this.cameras.main,
+            acceleration: 0.06,
+            drag: 0.1,
+            maxSpeed: 0
+        };
+
+        this.controls = new Phaser.Cameras.Controls.SmoothedKeyControl(controlConfig);
+		
+		this.input.on('pointermove', function (p) {
+    		if (!p.isDown) return;
+
+			cam.scrollX -= (p.x - p.prevPosition.x) / 128;
+			cam.scrollY -= (p.y - p.prevPosition.y) / 128;
+			  
+  		});
+		
+		metruss.forEach(function (metrus) {
+            metrus.update();
+        }); 
+	
+	
+    }
+	
+	
+    render () {
+        //this.debug.text(mapWidth + ' - ' + levelData, 2, 36, "#ffffff");
+        this.debug.text(this.time.fps || '--', 2, 14, "#a7aebe");
+    }
+	
+	
+    spawnTiles (thisTile) {
+		
+		//scene = GameScene;
+		
+		var gameWidth = game.config.width;
+		var gameHeight = game.config.height;
+		
+		const tileWidthHalf = tileWidth / 2;
+		const tileHeightHalf = tileHeight / 2;
+		
+		const centerX = mapWidth * tileWidthHalf;
+		const centerY = 64;
+		
+		var tileGroup = this.add.group();
+		dontWalk = this.add.group();
+     
+		for (var i = 0; i < levelData.length; i++)
+		{
+			for (var j = 0; j < levelData[0].length; j++)
+			{
+				tileType=levelData[i][j];
+				
+				var tile = new Phaser.Geom.Point(i,j);
+				
+				
+
+				const tx = (j - i) * tileWidthHalf
+				const ty = (j + i) * tileHeightHalf
+				
+				const isotopleftX = centerX + tx + tileWidthHalf; 
+				const isotopleftY = centerY + ty - tileHeight;
+				const isotoprightX = centerX + tx + tileWidth;
+				const isotoprightY = centerY + ty - tileHeightHalf;
+				const isobottomleftX = centerX + tx;
+				const isobottomleftY = centerY + ty - tileHeightHalf;
+				const isobottomrightX = centerX + tx + tileWidthHalf;
+				const isobottomrightY = centerY + ty;
+					
+				const iso = isotopleftX + ' ' + isotopleftY + ' ' + isotoprightX + ' ' + isotoprightY + ' ' + isobottomrightX + ' ' + isobottomrightY + ' ' + isobottomleftX + ' ' + isobottomleftY;
+				
+				//DEFINE TILE TYPES
+				
+				//GRASS0
+				if (tileType==0)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'flatsprite',0)
+				//thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+					//thisTileiso.bodydebugBodyColor = 0xadfefe;
+				
+				thisTile.depth = centerY + ty;
+				thisTile.isWalkable = true;				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					}
+				}
+				
+				//GRASS1
+				if (tileType==1)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'grasssprite',1);
+				//thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty;
+				thisTile.isWalkable = true;				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					}
+				}
+				
+				//GRASS2
+				if (tileType==2)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'grasssprite',2);
+								//thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty;
+				thisTile.isWalkable = true;				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					}
+				}
+				
+				//GRASS3
+				if (tileType==3)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'grasssprite',3);
+								//thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty;
+				thisTile.isWalkable = true;				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					}
+				}
+				
+				//GRASS4
+				if (tileType==4)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'grasssprite',4);
+								//thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty
+				thisTile.isWalkable = true;				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					} 
+				}
+				
+				//GRASS5
+				if (tileType==5)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'grasssprite',5);
+								//thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty
+				thisTile.isWalkable = true;				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					}
+				}
+							
+				//GRASS6
+				if (tileType==6)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'grasssprite',6);
+								//thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty
+				thisTile.isWalkable = true;				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					}  
+				}
+				
+				//GRASS7
+				if (tileType==7)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'grasssprite',7);
+								//thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty
+				thisTile.isWalkable = true;				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					}
+				}
+				
+				//GRASS8
+				if (tileType==8)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'grasssprite',8);
+								//thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty
+				thisTile.isWalkable = true;				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					}
+				}
+				
+				//WATER
+				if (tileType==9)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'flatsprite',5);
+				
+								thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty
+				thisTile.isWalkable = false;				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					}
+				}	
+
+				//WATER NORTHEAST
+				if (tileType==10)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'watersprite',27);
+								thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty
+				thisTile.isWalkable = false;				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					}
+				}
+				
+				//WATER EAST
+				if (tileType==11)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'watersprite',14);
+				
+								thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty;
+				thisTile.isWalkable = false;				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					}
+				}
+				
+				//WATER SOUTHEAST
+				if (tileType==12)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'watersprite',25);
+				
+								thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty;
+				thisTile.isWalkable = false;				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					}
+				}
+				
+				//WATER SOUTH
+				if (tileType==13)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'watersprite',17);
+				
+								thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty;
+				thisTile.isWalkable = false;				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					}
+				}
+				
+				//WATER SOUTHWEST
+				if (tileType==14)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'watersprite',24);
+				
+								thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty
+				thisTile.isWalkable = false;				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					}               
+				}
+				
+				//WATER WEST
+				if (tileType==15)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'watersprite',15);
+				
+								thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty
+				thisTile.isWalkable = false;				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					}
+				}
+				
+				//WATER NORTHWEST
+				if (tileType==16)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'watersprite',26);
+								thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty
+				thisTile.isWalkable = false;				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					}
+				}
+
+				//WATER NORTH
+				if (tileType==17)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'watersprite',16);
+				
+								thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty
+				thisTile.isWalkable = false;				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					}
+				}	
+				
+				//WATER EAST CORNER TIP
+				if (tileType==18)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'watersprite',11);
+				
+								thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty;
+				thisTile.isWalkable = false;				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					}
+				}	
+				
+				//WATER SOUTH CORNER TIP
+				if (tileType==19)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'watersprite',1);
+				
+								thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty
+				thisTile.isWalkable = false;				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					}
+				}
+				
+				//WATER WEST CORNER TIP
+				if (tileType==20)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'watersprite',10);
+				
+								thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty
+				thisTile.isWalkable = false;				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					}
+				}
+				
+				//WATER NORTH CORNER TIP
+				if (tileType==21)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'watersprite',0);
+				
+								thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty
+				thisTile.isWalkable = false;				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					}
+				}
+				
+				//TREE OBSTACLE
+				if (tileType==22)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'obstacles',0);
+				
+								thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty
+				thisTile.isWalkable = false;				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					}
+				}
+				
+				//SHRUB OBSTACLE
+				if (tileType==23)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'obstacles',1);
+								thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty
+				thisTile.isWalkable = false;				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					}
+				}
+				
+				//POND PLANT OBSTACLE
+				if (tileType==24)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'obstacles',2);
+				
+								thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty				
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					}
+				thisTile.isWalkable = false;
+				}
+
+				//SMALL POND OBSTACLE
+				if (tileType==25)
+				{
+				
+				poly = this.add.polygon(centerX + tx, centerY + ty -32, iso);
+				thisTile = this.add.sprite(centerX + tx, centerY + ty, 'obstacles',3);
+				
+								thisTileiso = this.matter.add.gameObject(poly, { shape: { type: 'fromVerts', verts: iso, flagInternal: true } }).setStatic(true);
+				thisTile.depth = centerY + ty
+				thisTile.isWalkable = false;
+				if (thisTile.isWalkable = false) {
+					dontWalk.add(thisTile);
+					}else{
+					tileGroup.add(thisTile);
+					} 
+				}	
+					
+				
+			}
+		}
+		
+    }	
+
+	
+}
